@@ -23,10 +23,10 @@ def youtube_search(options):
     # Call the search.list method to retrieve results matching the specified
     # query term.
     search_response = youtube.search().list(
-    q=options.q,
-    type='video',
-    part="id",
-    maxResults=options.max_results
+        q=options.q,
+        type='video',
+        part="id",
+        maxResults=options.max_results
     ).execute()
     yield search_response.get("items", [])
     token = search_response.get('nextPageToken', None)
@@ -51,16 +51,16 @@ def get_id_list(attrs):
         ids = []
         for item in d:
             ids.append(item['id']['videoId'])
-            yield ','.join(ids)
+        yield ','.join(ids)
 
 
 def get_video_detail(attrs):
     ids = get_id_list(attrs)
     for id in ids:
         response = youtube.videos().list(
-        part='snippet,statistics',
-        id=id,
-        maxResults=MAX_RESULT
+            part='snippet,statistics',
+            id=id,
+            maxResults=MAX_RESULT
         ).execute()
         yield response
 
