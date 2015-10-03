@@ -13,40 +13,54 @@ import csv
 DEVELOPER_KEY = "AIzaSyB2RmUIqOkeeIzgs3CKKX9GE0NrZrB421c"
 YOUTUBE_API_SERVICE_NAME = "youtube"
 YOUTUBE_API_VERSION = "v3"
+REGION_CODE = 'US'
 MAX_DATA = 100
 MAX_RESULT = 50
 youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION,
     developerKey=DEVELOPER_KEY)
 
-
-def youtube_search(options):
+def get_video_categories():
+    categories = youtube.videoCategories().list(
+        part='id,snippet',
+        regionCode='US',
+        ).execute()
+    result = []
+    for c in categories.get('items', []):
+        id, name = c['id'], c['snippet']['title']
+        result.append((id, name))
+    return result
+    
+def youtube_search():
     # Call the search.list method to retrieve results matching the specified
     # query term.
-    search_response = youtube.search().list(
-        q=options.q,
-        type='video',
-        part="id",
-        maxResults=options.max_results
-    ).execute()
-    yield search_response.get("items", [])
-    token = search_response.get('nextPageToken', None)
-    num = MAX_DATA
-
-    while token is not None and num > 0:
-        num -= MAX_RESULT
+    categories = get_video_categories()
+    for category in categories: 
+        id, name = category
+        print "Search youtube for category {}".format(name)
         search_response = youtube.search().list(
-            q=options.q,
             type='video',
             part="id",
+            videoCategoryId=id,
             maxResults=MAX_RESULT,
-            pageToken=token
         ).execute()
-        token = search_response.get('nextPageToken', None)
         yield search_response.get("items", [])
+        token = search_response.get('nextPageToken', None)
+        num = MAX_DATA - MAX_RESULT
+        while token is not None and num > 0:
+            search_response = youtube.search().list(
+                type='video',
+                part="id",
+                maxResults=MAX_RESULT,
+                videoCategoryId=id,
+                pageToken=token
+            ).execute()
+            token = search_response.get('nextPageToken', None)
+            num -= MAX_RESULT
+            yield search_response.get("items", [])
 
 
-def get_id_list(attrs):
-    data = youtube_search(attrs)
+def get_id_list():
+    data = youtube_search()
     for d in data:
         ids = []
         for item in d:
@@ -54,13 +68,13 @@ def get_id_list(attrs):
         yield ','.join(ids)
 
 
-def get_video_detail(attrs):
-    ids = get_id_list(attrs)
+def get_video_detail():
+    ids = get_id_list()
     for id in ids:
         response = youtube.videos().list(
-            part='snippet,statistics',
-            id=id,
-            maxResults=MAX_RESULT
+        part='snippet,statistics',
+        id=id,
+        maxResults=MAX_RESULT
         ).execute()
         yield response
 
@@ -85,20 +99,21 @@ def format_video(row):
     return d
 
 
-def crawl_video(attrs):
-    res = get_video_detail(attrs)
+def crawl_video():
+    res = get_video_detail()
     fieldnames = [
         'id', 'title', 'thumbnails', 'channelId',
         'categoryId', 'viewCount', 'likeCount',
         'dislikeCount', 'favoriteCount', 'commentCount'
     ]
-    with open(attrs.q+'.csv', 'w') as fd:
+    with open('youtube.csv', 'w') as fd:
         writer = csv.DictWriter(fd, fieldnames=fieldnames, delimiter='|')
         writer.writeheader()
         for r in res:
             for row in r.get('items', []):
-                video = format_video(row)
-                writer.writerow(video)
+                if row:
+                    video = format_video(row)
+                    writer.writerow(video)
 
 
 if __name__ == "__main__":
@@ -106,7 +121,9 @@ if __name__ == "__main__":
     argparser.add_argument("--max-results", help="Max results", default=25)
     args = argparser.parse_args()
     try:
-        crawl_video(args)
+        crawl_video()
     except HttpError, e:
         print "An HTTP error %d occurred:\n%s" % (e.resp.status, e.content)
+
+
 
