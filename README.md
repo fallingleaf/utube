@@ -1,6 +1,6 @@
 # Youtube video crawler
 
-# Setup project (Linux, Mac)
+## Setup project (Linux, Mac)
 
 **Python virtual environment**
 
